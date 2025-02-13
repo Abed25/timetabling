@@ -1,5 +1,13 @@
 import express from "express";
 import cors from "cors";
+import {
+  query,
+  body,
+  validationResult,
+  matchedData,
+  checkSchema,
+} from "express-validator";
+import { LecturesValidationSchemas } from "./utils/ValidationSchemas.mjs";
 
 const app = express();
 app.use(cors());
@@ -43,13 +51,17 @@ app.get("/", (req, res) => {
 //Query parameters
 app.get(
   "/api/lectures",
-  (req, res, next) => {
-    console.log("Accesing lectures routes 1");
-    next();
-  },
+  query("filter")
+    .isString()
+    .notEmpty()
+    .withMessage("Cannot be empty")
+    .isLength({ min: 3, max: 10 })
+    .withMessage("Only characters between 3 - 10"),
   (req, res) => {
-    console.log(req.query);
+    console.log(req["express-validator#contexts"]);
     const { filter, value } = req.query;
+    const results = validationResult(req);
+    console.log(results);
     //if filter and value are not defined reveal all
     if (filter && value) {
       return res.send(
@@ -77,13 +89,23 @@ app.get("/api/lectures/:id", resolvelectureById, (req, res) => {
 });
 
 //creating resources using POST API
-app.post("/api/lectures", (req, res) => {
-  console.log(req.body);
-  const { body } = req;
-  const newLecture = { id: lectures[lectures.length - 1].id + 1, ...body };
-  lectures.push(newLecture);
-  return res.status(201).send(newLecture);
-});
+app.post(
+  "/api/lectures",
+  checkSchema(LecturesValidationSchemas),
+  (req, res) => {
+    const results = validationResult(req);
+    console.log(results);
+    if (!results.isEmpty())
+      return res.status(400).send({ error: results.array() });
+    //console.log(req.body);
+    //Clean and verified data
+    const data = matchedData(req);
+    console.log(data);
+    const newLecture = { id: lectures[lectures.length - 1].id + 1, ...data };
+    lectures.push(newLecture);
+    return res.status(201).send(newLecture);
+  }
+);
 
 //PUT API
 app.put("/api/lectures/:id", resolvelectureById, (req, res) => {
